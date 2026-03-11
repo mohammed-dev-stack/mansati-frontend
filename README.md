@@ -90,106 +90,23 @@
 
 ```
 frontend/
-├── public/                          # الملفات الثابتة (صور افتراضية، أيقونات)
+├── public/                 # الملفات الثابتة (صور، أيقونات)
 ├── src/
-│   ├── app/                         # صفحات التطبيق (Next.js App Router)
-│   │   ├── (auth)/                  # صفحات المصادقة (login, register, admin-login)
-│   │   │   ├── login/
-│   │   │   │   └── page.tsx
-│   │   │   ├── register/
-│   │   │   │   └── page.tsx
-│   │   │   └── admin-login/
-│   │   │       └── page.tsx
-│   │   ├── admin/                    # صفحات لوحة التحكم
-│   │   │   ├── analytics/
-│   │   │   │   └── page.tsx
-│   │   │   ├── messages/
-│   │   │   │   └── page.tsx
-│   │   │   ├── posts/
-│   │   │   │   └── page.tsx
-│   │   │   ├── settings/
-│   │   │   │   └── page.tsx
-│   │   │   ├── system/
-│   │   │   │   └── page.tsx
-│   │   │   ├── users/
-│   │   │   │   ├── create/
-│   │   │   │   │   └── page.tsx
-│   │   │   │   └── page.tsx
-│   │   │   ├── layout.tsx
-│   │   │   └── page.tsx
-│   │   ├── messages/
-│   │   │   ├── [userId]/
-│   │   │   │   └── page.tsx
-│   │   │   └── page.tsx
-│   │   ├── posts/
-│   │   │   ├── [id]/
-│   │   │   │   └── page.tsx          # إعادة التوجيه إلى /posts?highlight=id
-│   │   │   └── page.tsx
-│   │   ├── profile/
-│   │   │   └── [id]/
-│   │   │       └── page.tsx
-│   │   ├── users/
-│   │   │   └── page.tsx
-│   │   ├── error.tsx
-│   │   ├── layout.tsx
-│   │   ├── not-found.tsx
-│   │   └── page.tsx
-│   ├── components/                    # مكونات قابلة لإعادة الاستخدام
-│   │   ├── admin/                     # مكونات خاصة بالأدمن
-│   │   │   ├── AdminHeader.tsx
-│   │   │   ├── AdminSidebar.tsx
-│   │   │   ├── RecentPosts.tsx
-│   │   │   ├── RecentUsers.tsx
-│   │   │   └── SystemHealth.tsx
-│   │   ├── layout/                    # مكونات التخطيط العام
-│   │   │   ├── Footer.tsx
-│   │   │   └── Navbar.tsx
-│   │   ├── messages/                  # مكونات الرسائل
-│   │   │   └── ChatBox.tsx
-│   │   ├── notifications/             # مكونات الإشعارات
-│   │   │   └── NotificationBell.tsx
-│   │   ├── posts/                     # مكونات المنشورات
-│   │   │   ├── PostCard.tsx
-│   │   │   ├── PostForm.tsx
-│   │   │   ├── PostsList.tsx
-│   │   │   └── ShareModal.tsx         # نافذة مشاركة المنشور
-│   │   ├── users/                     # مكونات المستخدمين
-│   │   │   ├── ProfileCard.tsx
-│   │   │   ├── UserCard.tsx
-│   │   │   └── UserList.tsx
-│   │   └── SocketInitializer.tsx
-│   ├── context/                       # React Context
-│   │   └── AuthContext.tsx
-│   ├── hooks/                          # Hooks مخصصة
-│   │   ├── useAuth.ts
-│   │   ├── usePosts.ts
-│   │   └── useProfile.ts
-│   ├── services/                       # خدمات API
-│   │   ├── api.ts
-│   │   ├── adminService.ts
-│   │   ├── followService.ts
-│   │   ├── messageService.ts
-│   │   ├── notificationService.ts
-│   │   ├── postService.ts
-│   │   ├── socketService.ts
-│   │   └── userService.ts
-│   ├── types/                          # تعريفات TypeScript
-│   │   ├── Admin.ts
-│   │   ├── Message.ts
-│   │   ├── Notification.ts
-│   │   ├── Post.ts
-│   │   └── User.ts
-│   ├── utils/                          # أدوات مساعدة
-│   │   ├── constants.ts
-│   │   ├── formatDate.ts
-│   │   └── security.ts
-│   └── styles/                         # أنماط عامة
-│       ├── globals.css
-│       └── variables.css
-├── .env.local                          # المتغيرات البيئية
-├── next.config.js                      # إعدادات Next.js
-├── package.json
-└── README.md                           # هذا الملف
+│   ├── app/                # صفحات التطبيق (Next.js App Router)
+│   │   ├── (auth)/         # صفحات المصادقة (login, register)
+│   │   ├── admin/          # صفحات لوحة التحكم
+│   │   ├── messages/       # نظام المراسلة
+│   │   ├── posts/          # عرض المنشورات
+│   │   └── profile/        # الملفات الشخصية
+│   ├── components/         # المكونات القابلة لإعادة الاستخدام
+│   ├── context/            # إدارة الحالة (Auth Context)
+│   ├── hooks/              # الـ Hooks المخصصة
+│   ├── services/           # خدمات التواصل مع الـ API
+│   ├── types/              # تعريفات TypeScript
+│   └── styles/             # ملفات الـ CSS والـ Globals
+├── .env.local              # المتغيرات البيئية
+├── next.config.js          # إعدادات Next.js
+└── package.json            # الاعتماديات والسكربتات
 ```
 
 ---
