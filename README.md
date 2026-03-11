@@ -87,12 +87,6 @@
 </div>
 
 ---
-
-## 📁 بنية المشروع (Project Structure)
-
-<div dir="ltr">
-
-```
 frontend/
 ├── public/                                 # الملفات الثابتة (صور افتراضية، أيقونات)
 ├── src/
@@ -194,7 +188,7 @@ frontend/
 ├── next.config.js                              # إعدادات Next.js
 ├── package.json
 └── README.md                                   # هذا الملف
-```
+
 
 </div>
 
@@ -585,7 +579,7 @@ SOFTWARE.
 - **المستودع الرسمي (Frontend)**: [github.com/bzbsndndjnd/mansati-frontend](https://github.com/bzbsndndjnd/mansati-frontend)
 - **المستودع الرسمي (Backend)**: [github.com/bzbsndndjnd/mansati-backend](https://github.com/bzbsndndjnd/mansati-backend) (قريباً)
 - **توثيق API (قريباً)**: [api-docs.example.com](https://api-docs.example.com)
-- **معاينة حية**: [demo.example.com](https://demo.example.com) (قريباً)
+- **معاينة حية**: [demo.example.com](https://demo.example.com) 
 
 ---
 
