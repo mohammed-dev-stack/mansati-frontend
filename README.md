@@ -68,25 +68,23 @@
 
 <div dir="rtl">
 
-| التقنية | الغرض |
-|---------|--------|
-| <img src="https://img.shields.io/badge/Next.js-15.2.0-black?logo=next.js" height="20"> | إطار العمل الرئيسي، التوجيه، SSR، التحسين |
-| <img src="https://img.shields.io/badge/React-19.0.0-61dafb?logo=react" height="20"> | بناء واجهات المستخدم |
-| <img src="https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript" height="20"> | أمان الأنواع، تحسين تجربة التطوير |
-| **CSS Modules** | تصميم معزول لكل مكون |
-| **React Icons / Font Awesome** | أيقونات متجهة جميلة |
-| **Recharts** | رسوم بيانية متجاوبة |
-| **Socket.IO Client** | اتصال فوري للإشعارات والرسائل |
-| **Axios** | إدارة طلبات HTTP مع Interceptors |
-| **date-fns** | معالجة وتنسيق التواريخ بالعربية |
-| **JWT Decode** | فك تشفير التوكنات محلياً |
-| **ESLint / Prettier** | جودة واتساق الكود |
-| **React Context** | إدارة الحالة (المصادقة، المنشورات) |
-| **Custom Hooks** | إعادة استخدام منطق الأعمال |
+### 💻 التقنيات الأساسية
+| التقنية | الشعار | الغرض |
+| :--- | :---: | :--- |
+| **Next.js 15** | <img src="https://img.shields.io/badge/Next.js-black?logo=next.js&logoColor=white" height="20"> | إطار العمل الرئيسي (SSR & Routing) |
+| **React 19** | <img src="https://img.shields.io/badge/React-61dafb?logo=react&logoColor=black" height="20"> | بناء واجهات المستخدم التفاعلية |
+| **TypeScript** | <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" height="20"> | أمان الأنواع وتحسين تجربة التطوير |
+
+### ⚙️ الأدوات والمكتبات
+- 🎨 **التصميم:** `CSS Modules` لتنسيق معزول واحترافي.
+- 📊 **الرسوم البيانية:** `Recharts` لعرض تحليلات المنصة بشكل مرئي.
+- ⚡ **التواصل الفوري:** `Socket.io` للإشعارات والرسائل اللحظية.
+- 📡 **إدارة البيانات:** `Axios` مع Interceptors للتعامل مع الـ API.
+- 🔐 **الأمان:** `JWT Decode` لمعالجة صلاحيات المستخدم.
+- 📅 **التواريخ:** `date-fns` لتنسيق الوقت والتواريخ بالعربية.
+- 🏗️ **إدارة الحالة:** `React Context` و `Custom Hooks` لإدارة منطق الأعمال.
 
 </div>
-
----
 frontend/
 ├── public/                                 # الملفات الثابتة (صور افتراضية، أيقونات)
 ├── src/
