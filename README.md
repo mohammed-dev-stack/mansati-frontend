@@ -67,25 +67,36 @@
 
 <div dir="rtl">
 
-### 💻 التقنيات الأساسية
+### 🏗️ البنية التحتية الأساسية (Core)
+> تعتمد المنصة على أحدث التقنيات لضمان السرعة والأمان.
 
-| التقنية | الشعار | الغرض |
-| :--- | :---: | :--- |
-| **Next.js 15** | <img src="https://img.shields.io/badge/Next.js-black?logo=next.js&logoColor=white" height="20"> | إطار العمل الرئيسي (SSR & Routing) |
-| **React 19** | <img src="https://img.shields.io/badge/React-61dafb?logo=react&logoColor=black" height="20"> | بناء واجهات المستخدم التفاعلية |
-| **TypeScript** | <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" height="20"> | أمان الأنواع وتحسين تجربة التطوير |
+* ![Next.js](https://img.shields.io/badge/Next.js-15.2-black?style=for-the-badge&logo=next.js) **إطار العمل:** التوجيه الذكي، SSR، وتحسين الأداء.
+* ![React](https://img.shields.io/badge/React-19.0-61dafb?style=for-the-badge&logo=react&logoColor=black) **الواجهة:** بناء مكونات تفاعلية متقدمة.
+* ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=for-the-badge&logo=typescript) **لغة البرمجة:** ضمان أمان الأنواع وتجنب أخطاء التشغيل.
 
-### ⚙️ الأدوات والمكتبات
+---
 
-* 🎨 **التصميم:** `CSS Modules` لتنسيق معزول واحترافي.
-* 📊 **الرسوم البيانية:** `Recharts` لعرض تحليلات المنصة بشكل مرئي.
-* ⚡ **التواصل الفوري:** `Socket.io` للإشعارات والرسائل اللحظية.
-* 📡 **إدارة البيانات:** `Axios` مع Interceptors للتعامل مع الـ API.
-* 🔐 **الأمان:** `JWT Decode` لمعالجة صلاحيات المستخدم.
-* 📅 **التواريخ:** `date-fns` لتنسيق الوقت والتواريخ بالعربية.
-* 🏗️ **إدارة الحالة:** `React Context` و `Custom Hooks` لإدارة منطق الأعمال.
+### 🎨 التصميم وتجربة المستخدم (UI/UX)
+* ✨ **التنسيق:** استخدام `CSS Modules` لضمان عدم تداخل الأنماط بين المكونات.
+* 📊 **البيانات:** `Recharts` لعرض إحصائيات المنصة برسوم بيانية تفاعلية.
+* 🖼️ **الأيقونات:** مزيج احترافي بين `React Icons` و `Font Awesome`.
+
+---
+
+### 🔐 الاتصال والأمان (Backend Integration)
+* ⚡ **الزمن الفعلي:** `Socket.io Client` لإرسال واستقبال الإشعارات فوراً.
+* 📡 **الطلبات:** `Axios` مع نظام `Interceptors` لإدارة التوكنات والطلبات.
+* 🛡️ **التشفير:** `JWT Decode` للتحقق من صلاحيات المستخدم محلياً.
+
+---
+
+### 🛠️ جودة الكود وإدارة الحالة
+* 🧠 **إدارة الحالة:** `React Context` مع `Custom Hooks` لتنظيم منطق الأعمال.
+* 📅 **التواريخ:** `date-fns` لمعالجة الأوقات بمرونة كاملة باللغة العربية.
+* 💎 **المعايير:** `ESLint` و `Prettier` لضمان كود نظيف وموحد.
 
 </div>
+---
 frontend/
 ├── public/                                 # الملفات الثابتة (صور افتراضية، أيقونات)
 ├── src/
