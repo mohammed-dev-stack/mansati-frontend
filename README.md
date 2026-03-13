@@ -586,11 +586,10 @@ SOFTWARE.
 
 ## 📬 روابط المشروع
 
-- **المستودع الرسمي (Frontend)**: [github.com/bzbsndndjnd/mansati-frontend](https://github.com/bzbsndndjnd/mansati-frontend)
-- **المستودع الرسمي (Backend)**: [github.com/bzbsndndjnd/mansati-backend](https://github.com/bzbsndndjnd/mansati-backend) (قريباً)
-- **توثيق API (قريباً)**: [api-docs.example.com](https://api-docs.example.com)
-- **معاينة حية**: [demo.example.com](https://demo.example.com) 
-
+- المستودع الرسمي (Frontend): https://github.com/mohammed-dev-stack/mansati-frontend
+- المستودع الرسمي (Backend): https://github.com/mohammed-dev-stack/mansati-backend
+- توثيق API: قريباً
+- المعاينة الحية: قريباً
 ---
 
 **منصتي** – لأن التواصل يستحق الأفضل.  
