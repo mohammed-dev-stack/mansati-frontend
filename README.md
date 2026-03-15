@@ -588,8 +588,8 @@ SOFTWARE.
 
 - المستودع الرسمي (Frontend): https://github.com/mohammed-dev-stack/mansati-frontend
 - المستودع الرسمي (Backend): https://github.com/mohammed-dev-stack/mansati-backend
-- توثيق API: قريباً
-- المعاينة الحية: قريباً
+- توثيق API: http://localhost:5000/api/docs/
+- المعاينة الحية: https://mansati-frontend-b2kl.vercel.app/admin-login
 ---
 
 **منصتي** – لأن التواصل يستحق الأفضل.  

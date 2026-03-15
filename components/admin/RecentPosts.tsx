@@ -1,10 +1,9 @@
 "use client";
 
-/**
- * @component RecentPosts
- * @description مكون عرض آخر المنشورات في لوحة الإدارة - نسخة احترافية 2026
- * @version 6.2.0
- */
+// components/admin/RecentPosts.tsx
+// 📝 عرض آخر المنشورات - نسخة آمنة مع تحويل البيانات
+// @version 6.3.0
+// @lastUpdated 2026
 
 import { useState, useEffect, useCallback } from "react";
 import { 
@@ -18,26 +17,10 @@ import {
   FaArrowLeft
 } from "react-icons/fa";
 import adminService from "@/services/adminService";
+import { Post } from "@/types/Post"; // ✅ استيراد النوع المحول
 import { secureLog, sanitizeImageUrl } from "@/utils/security";
 import { useRouter } from "next/navigation";
 import styles from "./RecentPosts.module.css";
-
-// --- الأنواع (Interfaces) ---
-interface Author {
-  _id: string;
-  name: string;
-  avatar?: string;
-}
-
-interface Post {
-  _id: string;
-  content: string;
-  author: Author | string;
-  createdAt: string;
-  likes: number;          // عدد الإعجابات
-  comments: number;       // عدد التعليقات
-  shares?: number;        // عدد المشاركات (اختياري)
-}
 
 export default function RecentPosts() {
   const router = useRouter();
@@ -53,11 +36,9 @@ export default function RecentPosts() {
       setLoading(true);
       setError(null);
       const response = await adminService.getPosts({ limit: 5 });
-      const postsData = response?.data || [];
-      
-      // التحقق من صحة البيانات
-      const validatedPosts = postsData.filter((post: any) => post && typeof post === 'object');
-      setPosts(validatedPosts);
+      // ✅ البيانات الآن آمنة ومحولة عبر toPostArray داخل adminService
+      const postsData = response.data || [];
+      setPosts(postsData);
     } catch (err) {
       setError("حدث خطأ أثناء جلب البيانات. يرجى المحاولة لاحقاً.");
       secureLog.error("Error fetching recent posts", err);
@@ -79,7 +60,7 @@ export default function RecentPosts() {
     return new Intl.RelativeTimeFormat('ar', { numeric: 'auto' }).format(
       Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24)), 
       'day'
-    ).replace('بعد', 'منذ'); // تحسين بسيط للتنسيق العربي
+    ).replace('بعد', 'منذ');
   }, []);
 
   // حذف المنشور
@@ -134,6 +115,7 @@ export default function RecentPosts() {
           </div>
         ) : (
           posts.map((post) => {
+            // ✅ استخراج بيانات الكاتب بشكل آمن
             const author = typeof post.author === 'object' ? post.author : null;
             return (
               <article key={post._id} className={styles.postItem}>
@@ -157,20 +139,20 @@ export default function RecentPosts() {
 
                 <div className={styles.footer}>
                   <div className={styles.statsGroup}>
-                    {/* عدد الإعجابات */}
+                    {/* ✅ عدد الإعجابات - آمن */}
                     <span className={styles.statItem} title="إجمالي الإعجابات">
-                      <FaHeart className={styles.iconLike} /> {post.likes ?? 0}
+                      <FaHeart className={styles.iconLike} /> {post.reactions?.length || 0}
                     </span>
 
-                    {/* عدد التعليقات */}
+                    {/* ✅ عدد التعليقات - آمن */}
                     <span className={styles.statItem} title="عدد التعليقات">
-                      <FaComment className={styles.iconComment} /> {post.comments ?? 0}
+                      <FaComment className={styles.iconComment} /> {post.comments?.length || 0}
                     </span>
                     
-                    {/* عدد المشاركات (إذا كانت متوفرة) */}
-                    {post.shares !== undefined && post.shares > 0 && (
+                    {/* ✅ عدد المشاركات - آمن */}
+                    {post.shares && post.shares.length > 0 && (
                       <span className={styles.statItem} title="عدد المشاركات">
-                        <small>مشاركة: {post.shares}</small>
+                        <small>مشاركة: {post.shares.length}</small>
                       </span>
                     )}
                   </div>

@@ -1,9 +1,8 @@
 // services/messageService.ts
-// 💬 مسؤول: إدارة الرسائل مع طبقة أمان - نسخة محسنة بالكامل
-// @version 5.3.1
-// @lastUpdated 2026
+// 💬 مسؤول: إدارة الرسائل والمحادثات - متوافقة مع نظام API v5.0
+// @version 6.0.0 | Production Ready
 
-import api from "@/services/api";
+import api, { ApiResponse } from "@/services/api"; // ✅ استخدام النوع الموحد
 import {
   Message,
   Conversation,
@@ -17,54 +16,17 @@ import { SECURITY_CONFIG, MESSAGES } from "@/utils/constants";
 import { sanitizeInput, secureLog } from "@/utils/security";
 
 // ============================================================================
-// أنواع البيانات العامة للاستجابة
-// ============================================================================
-
-interface ApiResponse<T> {
-  success: boolean;
-  data: T;
-  message?: string;
-  pagination?: any;
-}
-
-// ============================================================================
-// دوال مساعدة للاستجابة
-// ============================================================================
-
-/**
- * استخراج البيانات من استجابة API بشكل آمن
- * @param response - الاستجابة الخام
- * @param defaultValue - القيمة الافتراضية إذا فشل الاستخراج
- * @returns البيانات المستخرجة من النوع T
- */
-const extractData = <T>(response: any, defaultValue: T): T => {
-  if (!response) return defaultValue;
-
-  if (response?.success === true && response.data !== undefined) {
-    return response.data as T;
-  }
-
-  if (Array.isArray(response) || (typeof response === 'object' && response !== null)) {
-    return response as T;
-  }
-
-  secureLog.warn('Unexpected response structure', response);
-  return defaultValue;
-};
-
-// ============================================================================
 // خدمة الرسائل (Message Service)
 // ============================================================================
 
 const messageService = {
+
   // ========================================================================
   // المحادثات (Conversations)
   // ========================================================================
 
   /**
-   * جلب محادثة مع مستخدم محدد
-   * @param receiverId - معرف المستخدم المستقبل
-   * @param options - خيارات إضافية (مثل AbortSignal)
+   * جلب سجل المحادثة مع مستخدم معين
    */
   async getConversation(
     receiverId: string,
@@ -73,39 +35,32 @@ const messageService = {
     try {
       secureLog.info('📥 جلب المحادثة', { receiverId });
 
-      // تمرير signal بشكل صحيح إلى Axios مع تحويل النوع (آمن لأن الخاصية signal فقط هي المستخدمة)
-      const config = options?.signal ? { signal: options.signal } as any : {};
-      const response = await api.get<ApiResponse<Message[]>>(`/messages/conversation/${receiverId}`, config);
+      const response = await api.get<ApiResponse<Message[]>>(
+        `/messages/conversation/${receiverId}`, 
+        { signal: options?.signal } // Axios يدعم الـ signal مباشرة في النسخ الحديثة
+      );
 
-      const messages = extractData<Message[]>(response.data, []);
-      const safeMessages = toMessageArray(messages);
-
-      return safeMessages;
+      // تحويل البيانات الخام إلى مصفوفة رسائل آمنة (Typescript Mapping)
+      return toMessageArray(response.data?.data || []);
+      
     } catch (error: any) {
-      if (error.name === 'AbortError' || error.name === 'CanceledError') {
-        throw error;
-      }
-      secureLog.error('❌ فشل جلب المحادثة');
+      if (axios.isCancel(error)) throw error; // تجاهل أخطاء الإلغاء المتعمدة
+      secureLog.error('❌ فشل جلب المحادثة', error);
       return [];
     }
   },
 
   /**
-   * جلب جميع محادثات المستخدم الحالي
+   * جلب جميع المحادثات النشطة للمستخدم الحالي
    */
   async getUserConversations(): Promise<Conversation[]> {
     try {
-      secureLog.info('📥 جلب المحادثات');
+      secureLog.info('📥 جلب قائمة المحادثات');
 
       const response = await api.get<ApiResponse<Conversation[]>>(`/messages/user`);
 
-      let rawConversations = extractData<Conversation[]>(response.data, []);
-
-      if (rawConversations.length === 0 && response.data?.data && Array.isArray(response.data.data)) {
-        rawConversations = response.data.data;
-      }
-
-      const safeConversations = toConversationArray(rawConversations);
+      const conversations = response.data?.data || [];
+      const safeConversations = toConversationArray(conversations);
 
       secureLog.info(`✅ تم جلب ${safeConversations.length} محادثة`);
       return safeConversations;
@@ -116,125 +71,109 @@ const messageService = {
   },
 
   // ========================================================================
-  // الرسائل (Messages)
+  // إرسال وإدارة الرسائل (Messages)
   // ========================================================================
 
   /**
-   * إرسال رسالة جديدة
-   * @param text - نص الرسالة
-   * @param receiverId - معرف المستلم
+   * إرسال رسالة نصية جديدة
    */
   async sendMessage(text: string, receiverId: string): Promise<Message> {
     try {
-      secureLog.info('📤 إرسال رسالة', { receiverId });
+      const cleanText = sanitizeInput(text.trim());
 
-      if (text.length > SECURITY_CONFIG.MAX_CONTENT_LENGTH) {
+      if (cleanText.length > SECURITY_CONFIG.MAX_CONTENT_LENGTH) {
         throw new Error('الرسالة طويلة جداً');
       }
 
       const payload: SendMessageData = {
         receiver: receiverId,
-        text: sanitizeInput(text),
+        text: cleanText,
       };
 
+      secureLog.info('📤 إرسال رسالة جاري...');
       const response = await api.post<ApiResponse<Message>>(`/messages`, payload);
-      const rawMessage = extractData<Message>(response.data, {} as Message);
-      const safeMessage = toMessage(rawMessage);
-
-      secureLog.info('✅ تم إرسال الرسالة بنجاح');
-      return safeMessage;
+      
+      if (response.data?.success) {
+        secureLog.info('✅ تم الإرسال بنجاح');
+        return toMessage(response.data.data);
+      }
+      
+      throw new Error(MESSAGES.ERRORS.DEFAULT);
     } catch (error: any) {
       secureLog.error('❌ فشل إرسال الرسالة', error);
-      throw error;
+      throw error.userMessage || error.response?.data?.message || MESSAGES.ERRORS.DEFAULT;
     }
   },
 
   /**
-   * تحديث حالة قراءة الرسائل من مرسل معين
-   * @param senderId - معرف المرسل
+   * تحديث الرسائل لتصبح "مقروءة"
    */
   async markMessagesAsRead(senderId: string): Promise<void> {
     try {
-      secureLog.info('📥 تحديث حالة القراءة', { senderId });
       await api.patch(`/messages/read/${senderId}`);
+      secureLog.info('✅ تم تحديث حالة القراءة');
     } catch (error: any) {
       secureLog.error('❌ فشل تحديث حالة القراءة', error);
     }
   },
 
   /**
-   * حذف رسالة محددة
-   * @param messageId - معرف الرسالة
+   * حذف رسالة معينة
    */
   async deleteMessage(messageId: string): Promise<void> {
     try {
-      secureLog.info('🗑️ حذف رسالة', { messageId });
-      await api.delete(`/messages/${messageId}`);
-      secureLog.info('✅ تم حذف الرسالة بنجاح');
+      secureLog.info('🗑️ حذف رسالة...', { messageId });
+      const response = await api.delete<ApiResponse<null>>(`/messages/${messageId}`);
+      
+      if (!response.data?.success) throw new Error('فشل الحذف');
     } catch (error: any) {
       secureLog.error('❌ فشل حذف الرسالة', error);
-      throw error;
+      throw error.userMessage || 'لا يمكن حذف الرسالة حالياً';
     }
   },
 
   // ========================================================================
-  // البحث (Search)
+  // البحث المتقدم (Search)
   // ========================================================================
 
   /**
-   * البحث عن مستخدمين (لإرسال رسالة جديدة)
-   * @param query - نص البحث
-   * @param options - خيارات إضافية (مثل AbortSignal)
+   * البحث عن مستخدمين لبدء محادثة جديدة
    */
   async searchUsers(
     query: string,
     options?: { signal?: AbortSignal }
   ): Promise<SearchUserResult[]> {
     try {
-      secureLog.info('📥 البحث عن مستخدمين', { query });
+      const cleanQuery = query.trim();
+      if (cleanQuery.length < 2) return [];
 
-      if (query.length < 2) return [];
+      const response = await api.get<ApiResponse<SearchUserResult[]>>(
+        `/users/search?q=${encodeURIComponent(cleanQuery)}`,
+        { signal: options?.signal }
+      );
 
-      const config = options?.signal ? { signal: options.signal } as any : {};
-      const response = await api.get<ApiResponse<SearchUserResult[]>>(`/users/search?q=${encodeURIComponent(query)}`, config);
-
-      const users = extractData<SearchUserResult[]>(response.data, []);
-
-      secureLog.info(`✅ تم العثور على ${users.length} مستخدم`);
-      return users;
+      return response.data?.data || [];
     } catch (error: any) {
-      if (error.name === 'AbortError' || error.name === 'CanceledError') {
-        throw error;
-      }
-      secureLog.error('❌ فشل البحث عن مستخدمين', error);
+      if (axios.isCancel(error)) throw error;
+      secureLog.error('❌ فشل البحث', error);
       return [];
     }
   },
 
-  // ========================================================================
-  // إحصائيات (Stats) - للأدمن
-  // ========================================================================
-
   /**
-   * جلب إحصائيات الرسائل (للوحة تحكم الأدمن)
+   * إحصائيات سريعة للرسائل
    */
-  async getMessagesStats(): Promise<{ total: number; unread: number; conversations: number }> {
+  async getQuickStats(): Promise<{ total: number; unread: number }> {
     try {
       const conversations = await this.getUserConversations();
-
-      const total = conversations.reduce((acc, conv) => acc + (conv.messagesCount || 0), 0);
-      const unread = conversations.reduce((acc, conv) => acc + (conv.unreadCount || 0), 0);
-
       return {
-        total,
-        unread,
-        conversations: conversations.length,
+        total: conversations.reduce((acc, c) => acc + (c.messagesCount || 0), 0),
+        unread: conversations.reduce((acc, c) => acc + (c.unreadCount || 0), 0),
       };
-    } catch (error) {
-      secureLog.error('❌ فشل جلب إحصائيات الرسائل', error);
-      return { total: 0, unread: 0, conversations: 0 };
+    } catch {
+      return { total: 0, unread: 0 };
     }
-  },
+  }
 };
 
 export default messageService;

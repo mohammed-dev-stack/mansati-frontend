@@ -1,370 +1,160 @@
 // services/userService.ts
-// 👤 مسؤول: إدارة المستخدمين مع طبقة أمان وتجديد التوكن - نسخة محدثة
-// @version 4.4.1
-// @lastUpdated 2026
+// 👤 مسؤول: إدارة الهوية والمستخدمين (Auth & User Profile)
+// @version 5.0.0 | Production Ready
 
-import api from "./api";
+import api, { ApiResponse } from "./api";
 import { User, SearchUserResult, toUser, toUserArray } from "@/types/User";
-import { secureLog, sanitizeInput, decodeToken } from "@/utils/security";
+import { secureLog, sanitizeInput } from "@/utils/security";
 import { MESSAGES } from "@/utils/constants";
 
 // ============================================================================
-// أنواع البيانات (نستخدم الأنواع المستوردة فقط)
+// أنواع البيانات المحلية
 // ============================================================================
-
-interface ApiResponse<T> {
-  success: boolean;
-  data: T;
-  message?: string;
-  pagination?: any;
-}
 
 interface LoginResponse {
   user: User;
-  accessToken?: string;
   token?: string;
-}
-
-interface RequestOptions {
-  signal?: AbortSignal;
+  accessToken?: string;
 }
 
 // ============================================================================
-// دوال مساعدة
-// ============================================================================
-
-const extractData = <T>(response: any, defaultValue: T): T => {
-  if (!response) return defaultValue;
-  if (response?.success === true && response.data !== undefined) {
-    return response.data as T;
-  }
-  if (Array.isArray(response) || (typeof response === 'object' && response !== null)) {
-    return response as T;
-  }
-  secureLog.warn('Unexpected response structure', response);
-  return defaultValue;
-};
-
-const storeToken = (token: string) => {
-  try {
-    sessionStorage.setItem("accessToken", token);
-    const payload = decodeToken(token);
-    if (payload?.exp) {
-      sessionStorage.setItem("token_exp", payload.exp.toString());
-    }
-    secureLog.info('Token stored in sessionStorage');
-  } catch (error) {
-    console.error('❌ Error storing token:', error);
-  }
-};
-
-const clearStorage = () => {
-  sessionStorage.removeItem("accessToken");
-  sessionStorage.removeItem("token_exp");
-  localStorage.removeItem("user");
-};
-
-// ============================================================================
-// خدمة المستخدمين
+// خدمة المستخدمين (User Service)
 // ============================================================================
 
 const userService = {
-  // ========================================================================
-  // المصادقة
-  // ========================================================================
 
+  // --------------------------------------------------------------------------
+  // 1. المصادقة (Authentication)
+  // --------------------------------------------------------------------------
+
+  /**
+   * ✅ تسجيل الدخول
+   */
   async login(email: string, password: string): Promise<LoginResponse> {
     try {
-      if (!email || !password) {
-        throw new Error('البريد الإلكتروني وكلمة المرور مطلوبان');
-      }
-
-      console.log('🔄 Attempting login...');
+      secureLog.info('🔐 محاولة تسجيل الدخول...');
       const response = await api.post<ApiResponse<LoginResponse>>("/auth/login", {
         email: sanitizeInput(email),
         password
       });
 
-      const data = extractData<LoginResponse>(response.data, null as any);
-      if (!data) throw new Error('استجابة غير صالحة من الخادم');
+      const data = response.data.data;
       
-      secureLog.info('تسجيل دخول ناجح');
-
+      // تخزين التوكن (إذا لم يتم التعامل معه في الكوكيز من قبل السيرفر)
       const token = data.accessToken || data.token;
       if (token) {
-        storeToken(token);
-      } else {
-        console.warn('⚠️ No token received from server (cookies will be used)');
+        sessionStorage.setItem("token", token);
       }
 
-      localStorage.setItem("user", JSON.stringify(data.user));
+      // تخزين بيانات المستخدم الأساسية
+      localStorage.setItem("user", JSON.stringify(toUser(data.user)));
+      
       return data;
-
     } catch (error: any) {
-      console.error('❌ Login error:', error.response?.data || error.message);
-      secureLog.error('فشل تسجيل الدخول');
-      throw new Error(error.response?.data?.message || MESSAGES.ERRORS.LOGIN); // ✅ الآن LOGIN موجود
+      secureLog.error('❌ فشل تسجيل الدخول');
+      throw error.response?.data?.message || MESSAGES.ERRORS.LOGIN;
     }
   },
 
-  async register(userData: { name: string; email: string; password: string }): Promise<LoginResponse> {
+  /**
+   * ✅ تسجيل حساب جديد
+   */
+  async register(userData: any): Promise<LoginResponse> {
     try {
-      console.log('🟢 [userService] Registering user:', { email: userData.email });
       const response = await api.post<ApiResponse<LoginResponse>>("/auth/register", {
-        name: sanitizeInput(userData.name),
+        ...userData,
         email: sanitizeInput(userData.email),
-        password: userData.password,
+        name: sanitizeInput(userData.name)
       });
 
-      const data = extractData<LoginResponse>(response.data, null as any);
-      if (!data) throw new Error('استجابة غير صالحة من الخادم');
+      const data = response.data.data;
+      localStorage.setItem("user", JSON.stringify(toUser(data.user)));
       
-      console.log('🟢 [userService] Register success:', data);
-
-      const token = data.accessToken || data.token;
-      if (token) {
-        storeToken(token);
-      }
-
-      localStorage.setItem("user", JSON.stringify(data.user));
       return data;
-
     } catch (error: any) {
-      console.error('🔴 [userService] Register error:', {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message
-      });
-
-      if (error.response?.status === 409) {
-        throw new Error('البريد الإلكتروني مستخدم بالفعل');
-      }
-
-      throw new Error(error.response?.data?.message || MESSAGES.ERRORS.REGISTER); // ✅ الآن REGISTER موجود
+      secureLog.error('❌ فشل إنشاء الحساب');
+      throw error.response?.data?.message || MESSAGES.ERRORS.REGISTER;
     }
   },
 
+  /**
+   * ✅ تسجيل الخروج وتطهير البيانات
+   */
   async logout(): Promise<void> {
     try {
-      console.log('🔄 Attempting logout...');
       await api.post("/auth/logout");
-      console.log('✅ Logout successful');
-    } catch (error) {
-      console.error('❌ Logout error:', error);
-      secureLog.error('خطأ في تسجيل الخروج');
     } finally {
-      clearStorage();
-      secureLog.info('تم تسجيل الخروج بنجاح');
+      localStorage.removeItem("user");
+      sessionStorage.removeItem("token");
+      secureLog.info('🚪 تم تسجيل الخروج');
     }
   },
 
-  async refreshToken(): Promise<{ accessToken: string }> {
+  // --------------------------------------------------------------------------
+  // 2. جلب البيانات والبحث (Fetch & Search)
+  // --------------------------------------------------------------------------
+
+  /**
+   * ✅ البحث عن مستخدمين
+   */
+  async searchUsers(query: string, signal?: AbortSignal): Promise<SearchUserResult[]> {
     try {
-      console.log('🔄 Refreshing token...');
-      const response = await api.post<ApiResponse<{ accessToken: string }>>('/auth/refresh');
-      const data = extractData<{ accessToken: string }>(response.data, null as any);
-      if (!data) throw new Error('استجابة غير صالحة');
-      
-      if (data.accessToken) {
-        storeToken(data.accessToken);
-        console.log('✅ Token refreshed');
-      }
-      
-      return data;
+      const response = await api.get<ApiResponse<SearchUserResult[]>>(
+        `/users/search?q=${encodeURIComponent(query)}`, 
+        { signal }
+      );
+      return response.data.data || [];
     } catch (error: any) {
-      console.error('❌ Refresh token error:', error);
-      throw new Error(error.response?.data?.message || 'فشل تجديد التوكن');
-    }
-  },
-
-  // ========================================================================
-  // ✅ دوال جلب المستخدمين
-  // ========================================================================
-
-  async getAllUsers(options?: RequestOptions): Promise<User[]> {
-    try {
-      console.log('📥 [userService] Fetching all users...');
-      const config = options?.signal ? { signal: options.signal } as any : {};
-      const response = await api.get<ApiResponse<User[]>>('/users', config);
-      console.log('📥 [userService] Response:', response.data);
-
-      const users = extractData<User[]>(response.data, []);
-      const safeUsers = toUserArray(users);
-      console.log(`✅ [userService] Loaded ${safeUsers.length} users`);
-      return safeUsers;
-    } catch (error: any) {
-      if (error.name === 'AbortError' || error.name === 'CanceledError') {
-        console.log('🛑 [userService] Fetch aborted');
-        throw error;
-      }
-      console.error('❌ [userService] Get all users error:', error);
+      if (error.name === 'CanceledError') return [];
       return [];
     }
   },
 
-  async searchUsers(query: string, options?: RequestOptions): Promise<SearchUserResult[]> {
+  /**
+   * ✅ جلب بيانات مستخدم بالمعرف
+   */
+  async getById(id: string): Promise<User> {
     try {
-      console.log(`🔍 [userService] Searching for: "${query}"`);
-      const config = options?.signal ? { signal: options.signal } as any : {};
-      const response = await api.get<ApiResponse<SearchUserResult[]>>(`/users/search?q=${encodeURIComponent(query)}`, config);
-
-      const results = extractData<SearchUserResult[]>(response.data, []);
-
-      const safeResults: SearchUserResult[] = results.map(item => ({
-        _id: item._id || '',
-        name: item.name || '',
-        avatar: item.avatar,
-        followersCount: item.followersCount || 0,
-        followingCount: item.followingCount || 0,
-        postsCount: item.postsCount || 0,
-        email: item.email,
-      }));
-
-      console.log(`✅ [userService] Found ${safeResults.length} users for "${query}"`);
-      return safeResults;
+      const response = await api.get<ApiResponse<User>>(`/users/${id}`);
+      return toUser(response.data.data);
     } catch (error: any) {
-      if (error.name === 'AbortError' || error.name === 'CanceledError') {
-        return [];
-      }
-      console.error('❌ [userService] Search error:', error);
-      return [];
+      throw error.response?.data?.message || MESSAGES.ERRORS.NOT_FOUND;
     }
   },
 
-  async getById(id: string, options?: RequestOptions): Promise<User> {
-    try {
-      if (!id) throw new Error('معرف المستخدم مطلوب');
+  // --------------------------------------------------------------------------
+  // 3. تحديث البيانات (Profile Management)
+  // --------------------------------------------------------------------------
 
-      console.log('🔄 Fetching user by ID:', id);
-      const config = options?.signal ? { signal: options.signal } as any : {};
-      const response = await api.get<ApiResponse<User>>(`/users/${id}`, config);
-
-      const userData = extractData<any>(response.data, null);
-      const safeUser = toUser(userData);
-      console.log('✅ User fetched successfully:', safeUser.email);
-      return safeUser;
-    } catch (error: any) {
-      if (error.name === 'AbortError' || error.name === 'CanceledError') {
-        console.log('🛑 Fetch aborted for user:', id);
-        throw error;
-      }
-
-      console.error('❌ Error fetching user:', error.response?.data || error.message);
-      secureLog.error('فشل جلب المستخدم');
-      throw new Error(error.response?.data?.message || MESSAGES.ERRORS.NOT_FOUND);
-    }
-  },
-
-  async getUserById(id: string, options?: RequestOptions): Promise<User> {
-    return this.getById(id, options);
-  },
-
-  // ========================================================================
-  // عمليات المستخدمين الفردية
-  // ========================================================================
-
-  async updateUser(id: string, updates: Partial<User>, options?: RequestOptions): Promise<User> {
-    try {
-      if (!id) throw new Error('معرف المستخدم مطلوب');
-
-      const sanitizedUpdates: Partial<User> = {};
-      if (updates.name) sanitizedUpdates.name = sanitizeInput(updates.name);
-      if (updates.email) sanitizedUpdates.email = sanitizeInput(updates.email);
-
-      console.log('🔄 Updating user:', id);
-      const config = options?.signal ? { signal: options.signal } as any : {};
-      const response = await api.put<ApiResponse<User>>(`/users/${id}`, sanitizedUpdates, config);
-
-      const userData = extractData<any>(response.data, null);
-      const safeUser = toUser(userData);
-
-      const currentUser = this.getCurrentUser();
-      if (currentUser?._id === id) {
-        localStorage.setItem("user", JSON.stringify(safeUser));
-      }
-
-      console.log('✅ User updated successfully');
-      return safeUser;
-    } catch (error: any) {
-      if (error.name === 'AbortError' || error.name === 'CanceledError') {
-        console.log('🛑 Update aborted for user:', id);
-        throw error;
-      }
-      console.error('❌ Error updating user:', error.response?.data || error.message);
-      secureLog.error('فشل تحديث المستخدم');
-      throw new Error(error.response?.data?.message || MESSAGES.ERRORS.DEFAULT);
-    }
-  },
-
-  async deleteUser(id: string): Promise<void> {
-    try {
-      if (!id) throw new Error('معرف المستخدم مطلوب');
-
-      console.log('🔄 Deleting user:', id);
-      const response = await api.delete<ApiResponse<null>>(`/users/${id}`);
-      if (!response.data?.success) {
-        throw new Error('فشل حذف المستخدم');
-      }
-      console.log('✅ User deleted successfully');
-
-      const currentUser = this.getCurrentUser();
-      if (currentUser?._id === id) {
-        clearStorage();
-      }
-    } catch (error: any) {
-      console.error('❌ Error deleting user:', error.response?.data || error.message);
-      secureLog.error('فشل حذف المستخدم');
-      throw new Error(error.response?.data?.message || MESSAGES.ERRORS.DEFAULT);
-    }
-  },
-
+  /**
+   * ✅ تحديث الصورة الشخصية (Avatar)
+   */
   async updateAvatar(id: string, file: File): Promise<User> {
-    try {
-      if (!id) throw new Error('معرف المستخدم مطلوب');
-      if (!file) throw new Error('الملف مطلوب');
+    const formData = new FormData();
+    formData.append("avatar", file);
 
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-      if (!allowedTypes.includes(file.type)) {
-        throw new Error('نوع الملف غير مسموح به');
-      }
+    const response = await api.put<ApiResponse<User>>(`/users/${id}/avatar`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
 
-      if (file.size > 5 * 1024 * 1024) {
-        throw new Error('حجم الملف كبير جداً. الحد الأقصى 5 ميجابايت');
-      }
-
-      const formData = new FormData();
-      formData.append("avatar", file);
-
-      console.log('🔄 Updating avatar for user:', id);
-      const response = await api.put<ApiResponse<User>>(`/users/${id}/avatar`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      const userData = extractData<any>(response.data, null);
-      const safeUser = toUser(userData);
-
-      const currentUser = this.getCurrentUser();
-      if (currentUser?._id === id) {
-        localStorage.setItem("user", JSON.stringify(safeUser));
-      }
-
-      console.log('✅ Avatar updated successfully');
-      return safeUser;
-    } catch (error: any) {
-      console.error('❌ Error updating avatar:', error.response?.data || error.message);
-      secureLog.error('فشل تحديث الصورة');
-      throw new Error(error.response?.data?.message || error.message || MESSAGES.ERRORS.DEFAULT);
+    const updatedUser = toUser(response.data.data);
+    
+    // تحديث التخزين المحلي إذا كان هذا هو المستخدم الحالي
+    if (this.getCurrentUser()?._id === id) {
+      localStorage.setItem("user", JSON.stringify(updatedUser));
     }
+
+    return updatedUser;
   },
 
+  /**
+   * ✅ الحصول على بيانات المستخدم الحالي المخزنة محلياً
+   */
   getCurrentUser(): User | null {
-    try {
-      const userStr = localStorage.getItem('user');
-      return userStr ? JSON.parse(userStr) : null;
-    } catch {
-      return null;
-    }
-  },
+    if (typeof window === 'undefined') return null;
+    const user = localStorage.getItem('user');
+    return user ? JSON.parse(user) : null;
+  }
 };
 
 export default userService;

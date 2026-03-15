@@ -1,236 +1,170 @@
 // services/postService.ts
-// 📝 خدمة المنشورات - نسخة محسنة مع ApiResponse واستخراج آمن
-// @version 3.0.0
-// @lastUpdated 2026
+// 📝 خدمة المنشورات - متوافقة مع نظام API v5.0 ومعالجة الميديا
+// @version 4.0.0 | Production Ready
 
-import api from "./api";
-import { Post } from "@/types/Post";
+import api, { ApiResponse } from "./api"; // ✅ استخدام النوع الموحد
+import { Post, toPost, toPostArray } from "@/types/Post";
 import { SECURITY_CONFIG, MESSAGES } from "@/utils/constants";
 import { sanitizeInput, secureLog } from "@/utils/security";
 
 // ============================================================================
-// أنواع البيانات العامة للاستجابة
+// دوال التحقق المسبق (Validation Helpers)
 // ============================================================================
-
-interface ApiResponse<T> {
-  success: boolean;
-  data: T;
-  message?: string;
-  pagination?: any;
-}
-
-// ============================================================================
-// دوال مساعدة
-// ============================================================================
-
-/**
- * استخراج البيانات من استجابة API بشكل آمن
- */
-const extractData = <T>(response: any, defaultValue: T): T => {
-  if (!response) return defaultValue;
-  if (response?.success === true && response.data !== undefined) {
-    return response.data as T;
-  }
-  if (Array.isArray(response) || (typeof response === 'object' && response !== null)) {
-    return response as T;
-  }
-  secureLog.warn('Unexpected response structure', response);
-  return defaultValue;
-};
 
 const validatePostData = (formData: FormData): void => {
   const content = formData.get('content') as string;
   const media = formData.getAll('media') as File[];
   
   if (content && content.length > SECURITY_CONFIG.MAX_CONTENT_LENGTH) {
-    throw new Error(`المحتوى يجب أن لا يتجاوز ${SECURITY_CONFIG.MAX_CONTENT_LENGTH} حرف`);
+    throw new Error(`المحتوى طويل جداً (الحد الأقصى ${SECURITY_CONFIG.MAX_CONTENT_LENGTH} حرف)`);
   }
   
   media.forEach(file => {
-    if (file.size > SECURITY_CONFIG.MAX_FILE_SIZE) {
-      throw new Error('حجم الملف كبير جداً. الحد الأقصى 10 ميجابايت');
-    }
-    
-    const isImage = SECURITY_CONFIG.ALLOWED_IMAGE_TYPES.includes(file.type);
-    const isVideo = SECURITY_CONFIG.ALLOWED_VIDEO_TYPES.includes(file.type);
-    
-    if (!isImage && !isVideo) {
-      throw new Error('نوع الملف غير مسموح به');
+    if (file instanceof File) {
+      if (file.size > SECURITY_CONFIG.MAX_FILE_SIZE) {
+        throw new Error(`الملف ${file.name} كبير جداً (الحد الأقصى 10MB)`);
+      }
+      
+      const isImage = SECURITY_CONFIG.ALLOWED_IMAGE_TYPES.includes(file.type);
+      const isVideo = SECURITY_CONFIG.ALLOWED_VIDEO_TYPES.includes(file.type);
+      
+      if (!isImage && !isVideo) {
+        throw new Error('نوع الملف غير مدعوم');
+      }
     }
   });
 };
 
 // ============================================================================
-// خدمة المنشورات
+// خدمة المنشورات (Post Service)
 // ============================================================================
 
 const postService = {
+
   /**
-   * جلب جميع المنشورات
+   * ✅ جلب جميع منشورات الصفحة الرئيسية
    */
   async getAll(): Promise<Post[]> {
     try {
+      secureLog.info('📥 جلب المنشورات العامة...');
       const response = await api.get<ApiResponse<Post[]>>("/posts");
-      const posts = extractData<Post[]>(response.data, []);
-      return posts;
+      
+      return toPostArray(response.data?.data || []);
     } catch (error: any) {
-      secureLog.error('فشل جلب البوستات');
-      console.error('❌ Error fetching posts:', error.response?.data || error.message);
-      throw {
-        ...error,
-        userMessage: MESSAGES.ERRORS.DEFAULT
-      };
+      secureLog.error('❌ فشل جلب المنشورات', error);
+      return []; // إرجاع مصفوفة فارغة لضمان عدم تعطل الواجهة
     }
   },
 
   /**
-   * جلب منشورات مستخدم محدد
+   * ✅ جلب منشورات مستخدم معين (للملف الشخصي)
    */
   async getByUser(userId: string): Promise<Post[]> {
     try {
-      console.log('📥 Fetching posts for user:', userId);
+      secureLog.info(`📥 جلب منشورات المستخدم: ${userId}`);
       const response = await api.get<ApiResponse<Post[]>>(`/posts/user/${userId}`);
-      const posts = extractData<Post[]>(response.data, []);
-      console.log('✅ Posts fetched:', posts?.length || 0);
-      return posts;
+      
+      return toPostArray(response.data?.data || []);
     } catch (error: any) {
-      secureLog.error('فشل جلب بوستات المستخدم');
-      console.error('❌ Error fetching user posts:', error.response?.data || error.message);
-      throw {
-        ...error,
-        userMessage: MESSAGES.ERRORS.DEFAULT
-      };
+      secureLog.error('❌ فشل جلب منشورات المستخدم', error);
+      return [];
     }
   },
 
   /**
-   * إنشاء منشور جديد
+   * ✅ إنشاء منشور جديد (يدعم النصوص والميديا)
    */
   async create(formData: FormData): Promise<Post> {
     try {
       validatePostData(formData);
       
+      // تأمين النص قبل الإرسال
       const content = formData.get('content') as string;
       if (content) {
-        formData.set('content', sanitizeInput(content));
+        formData.set('content', sanitizeInput(content.trim()));
       }
 
-      console.log('📤 Creating new post');
+      secureLog.info('📤 جاري رفع المنشور والميديا...');
       const response = await api.post<ApiResponse<Post>>("/posts", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       
-      const newPost = extractData<Post>(response.data, null as any);
-      if (!newPost) throw new Error('فشل إنشاء المنشور');
-      
-      console.log('✅ Post created successfully');
-      return newPost;
-    } catch (error: any) {
-      secureLog.error('فشل إنشاء البوست');
-      console.error('❌ Error creating post:', error.response?.data || error.message);
-      throw {
-        ...error,
-        userMessage: error.message || MESSAGES.ERRORS.DEFAULT
-      };
-    }
-  },
-
-  /**
-   * حذف منشور
-   */
-  async delete(id: string): Promise<void> {
-    try {
-      console.log('🗑️ Deleting post:', id);
-      const response = await api.delete<ApiResponse<null>>(`/posts/${id}`);
-      if (!response.data?.success) {
-        throw new Error('فشل حذف المنشور');
+      if (response.data?.success) {
+        secureLog.info('✅ تم إنشاء المنشور بنجاح');
+        return toPost(response.data.data);
       }
-      console.log('✅ Post deleted successfully');
-    } catch (error: any) {
-      secureLog.error('فشل حذف البوست');
-      console.error('❌ Error deleting post:', error.response?.data || error.message);
-      throw {
-        ...error,
-        userMessage: MESSAGES.ERRORS.DEFAULT
-      };
-    }
-  },
-
-  /**
-   * إضافة تعليق
-   */
-  async addComment(postId: string, text: string): Promise<Post> {
-    try {
-      if (text.length > SECURITY_CONFIG.MAX_COMMENT_LENGTH) {
-        throw new Error(`التعليق يجب أن لا يتجاوز ${SECURITY_CONFIG.MAX_COMMENT_LENGTH} حرف`);
-      }
-
-      console.log('💬 Adding comment to post:', postId);
-      const response = await api.post<ApiResponse<Post>>(
-        `/posts/${postId}/comment`,
-        { text: sanitizeInput(text) }
-      );
       
-      const updatedPost = extractData<Post>(response.data, null as any);
-      if (!updatedPost) throw new Error('فشل إضافة التعليق');
-      console.log('✅ Comment added successfully');
-      return updatedPost;
+      throw new Error(MESSAGES.ERRORS.DEFAULT);
     } catch (error: any) {
-      secureLog.error('فشل إضافة تعليق');
-      console.error('❌ Error adding comment:', error.response?.data || error.message);
-      throw {
-        ...error,
-        userMessage: error.message || MESSAGES.ERRORS.DEFAULT
-      };
+      secureLog.error('❌ فشل إنشاء المنشور', error);
+      throw error.userMessage || error.message || MESSAGES.ERRORS.DEFAULT;
     }
   },
 
   /**
-   * إضافة مشاركة
-   */
-  async addShare(postId: string): Promise<Post> {
-    try {
-      console.log('🔄 Sharing post:', postId);
-      const response = await api.post<ApiResponse<Post>>(`/posts/${postId}/share`);
-      
-      const updatedPost = extractData<Post>(response.data, null as any);
-      if (!updatedPost) throw new Error('فشل مشاركة المنشور');
-      console.log('✅ Post shared successfully');
-      return updatedPost;
-    } catch (error: any) {
-      secureLog.error('فشل مشاركة البوست');
-      console.error('❌ Error sharing post:', error.response?.data || error.message);
-      throw {
-        ...error,
-        userMessage: MESSAGES.ERRORS.DEFAULT
-      };
-    }
-  },
-
-  /**
-   * إضافة تفاعل
+   * ✅ إضافة تفاعل (Like/Love/etc)
    */
   async addReaction(postId: string, type: string): Promise<Post> {
     try {
-      console.log('❤️ Adding reaction to post:', postId, 'type:', type);
       const response = await api.post<ApiResponse<Post>>(
         `/posts/${postId}/react`,
         { type }
       );
-      
-      const updatedPost = extractData<Post>(response.data, null as any);
-      if (!updatedPost) throw new Error('فشل إضافة التفاعل');
-      console.log('✅ Reaction added successfully');
-      return updatedPost;
+      return toPost(response.data.data);
     } catch (error: any) {
-      secureLog.error('فشل إضافة تفاعل');
-      console.error('❌ Error adding reaction:', error.response?.data || error.message);
-      throw {
-        ...error,
-        userMessage: MESSAGES.ERRORS.DEFAULT
-      };
+      secureLog.error('❌ فشل التفاعل', error);
+      throw error.userMessage || MESSAGES.ERRORS.DEFAULT;
     }
   },
+
+  /**
+   * ✅ إضافة تعليق جديد
+   */
+  async addComment(postId: string, text: string): Promise<Post> {
+    try {
+      if (text.trim().length > SECURITY_CONFIG.MAX_COMMENT_LENGTH) {
+        throw new Error(`التعليق طويل جداً`);
+      }
+
+      const response = await api.post<ApiResponse<Post>>(
+        `/posts/${postId}/comment`,
+        { text: sanitizeInput(text.trim()) }
+      );
+      
+      return toPost(response.data.data);
+    } catch (error: any) {
+      secureLog.error('❌ فشل إضافة التعليق', error);
+      throw error.userMessage || error.message || MESSAGES.ERRORS.DEFAULT;
+    }
+  },
+
+  /**
+   * ✅ مشاركة المنشور (Share)
+   */
+  async addShare(postId: string): Promise<Post> {
+    try {
+      const response = await api.post<ApiResponse<Post>>(`/posts/${postId}/share`);
+      return toPost(response.data.data);
+    } catch (error: any) {
+      secureLog.error('❌ فشل المشاركة', error);
+      throw error.userMessage || MESSAGES.ERRORS.DEFAULT;
+    }
+  },
+
+  /**
+   * ✅ حذف المنشور
+   */
+  async delete(id: string): Promise<void> {
+    try {
+      secureLog.info(`🗑️ حذف المنشور: ${id}`);
+      const response = await api.delete<ApiResponse<null>>(`/posts/${id}`);
+      
+      if (!response.data?.success) throw new Error('فشل حذف المنشور');
+    } catch (error: any) {
+      secureLog.error('❌ فشل حذف المنشور', error);
+      throw error.userMessage || MESSAGES.ERRORS.DEFAULT;
+    }
+  }
 };
 
 export default postService;

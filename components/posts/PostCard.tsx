@@ -2,7 +2,7 @@
 
 // 🎴 PostCard.tsx
 // مسؤول: عرض منشور واحد بشكل آمن مع دعم المتابعة والمشاركة
-// الإصدار: 3.1.0 | آخر تحديث: 2026
+// الإصدار: 3.3.0 | آخر تحديث: 2026
 
 import { useState, useCallback, memo } from "react";
 import { Post } from "@/types/Post";
@@ -30,7 +30,7 @@ interface PostCardProps {
   onDelete?: (id: string) => Promise<void>;
   onReact: (postId: string, reaction: string) => void;
   onComment: (postId: string, comment: string) => void;
-  onShare: (postId: string) => void;
+  onShare: (postId: string) => void; // ✅ هذه الدالة تزيد العداد عبر API
   onFollow?: (userId: string) => Promise<void>;
   onUnfollow?: (userId: string) => Promise<void>;
   currentUserId?: string;
@@ -54,9 +54,10 @@ const PostCard = memo(({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [localIsFollowing, setLocalIsFollowing] = useState(isFollowing);
-  const [showShareModal, setShowShareModal] = useState(false); // ✅ هنا داخل المكون
+  const [showShareModal, setShowShareModal] = useState(false);
   const { user } = useAuth();
 
+  // استخراج بيانات الكاتب بشكل آمن
   const authorId = typeof post.author === "string" ? post.author : post.author?._id || '';
   const authorName = typeof post.author === "string" ? "مستخدم" : post.author?.name || "مستخدم";
   const authorAvatar = typeof post.author === "string" ? null : post.author?.avatar || null;
@@ -64,6 +65,7 @@ const PostCard = memo(({
   const isOwner = currentUserId === authorId;
   const canFollow = !isOwner && currentUserId && (onFollow || onUnfollow);
 
+  // البحث عن تفاعل المستخدم الحالي
   const userReaction = post.reactions?.find((r) => {
     const reactionUserId = typeof r.user === "object" ? r.user?._id : r.user;
     return reactionUserId === currentUserId;
@@ -128,6 +130,19 @@ const PostCard = memo(({
       setFollowLoading(false);
     }
   }, [authorId, localIsFollowing, onFollow, onUnfollow, followLoading]);
+
+  // ✅ معالج مشاركة جديد: يزيد العداد ثم يفتح النافذة
+  const handleShareClick = useCallback(async () => {
+    try {
+      // استدعاء onShare لزيادة العداد عبر API
+      await onShare(post._id);
+      // بعد النجاح، افتح نافذة المشاركة
+      setShowShareModal(true);
+    } catch (error) {
+      console.error("فشل مشاركة المنشور", error);
+      secureLog.error("فشل مشاركة المنشور");
+    }
+  }, [onShare, post._id]);
 
   // ==========================================================================
   // التصيير
@@ -292,7 +307,7 @@ const PostCard = memo(({
 
         <button
           className={styles.actionBtn}
-          onClick={() => setShowShareModal(true)}
+          onClick={handleShareClick} // ✅ استخدم المعالج الجديد
           aria-label="مشاركة"
         >
           <FaShare />
@@ -323,7 +338,7 @@ const PostCard = memo(({
           </div>
 
           {/* Comments List */}
-          {post.comments && post.comments.length > 0 ? (
+          {Array.isArray(post.comments) && post.comments.length > 0 ? (
             <div className={styles.commentsList}>
               {post.comments.map((comment, idx) => {
                 const commentUserName = typeof comment.user === "string"

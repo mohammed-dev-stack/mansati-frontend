@@ -1,27 +1,18 @@
 // services/notificationService.ts
-// 🔔 خدمة الإشعارات - نسخة محسنة مع ApiResponse
-// @version 2.2.0
-// @lastUpdated 2026
+// 🔔 خدمة الإشعارات - نسخة متوافقة مع نظام API v5.0
+// @version 3.0.0 | Production Ready
 
-import api from "./api";
+import api, { ApiResponse } from "./api"; // ✅ استخدام النوع الموحد
 import type { 
     Notification, 
     NotificationsResponse, 
-    UnreadCountResponse,
     NotificationType 
 } from "@/types/Notification";
 import { secureLog } from "@/utils/security";
 
 // ============================================================================
-// أنواع إضافية للخدمة
+// الأنواع الخاصة بالخدمة
 // ============================================================================
-
-interface ApiResponse<T> {
-  success: boolean;
-  data: T;
-  message?: string;
-  pagination?: any;
-}
 
 export interface CreateNotificationData {
     recipient: string;
@@ -35,151 +26,115 @@ export interface CreateNotificationData {
 }
 
 // ============================================================================
-// دوال مساعدة
-// ============================================================================
-
-const extractData = <T>(response: any, defaultValue: T): T => {
-  if (!response) return defaultValue;
-  if (response?.success === true && response.data !== undefined) {
-    return response.data as T;
-  }
-  if (Array.isArray(response) || (typeof response === 'object' && response !== null)) {
-    return response as T;
-  }
-  secureLog.warn('Unexpected response structure', response);
-  return defaultValue;
-};
-
-// ============================================================================
-// خدمة الإشعارات
+// خدمة الإشعارات (Notification Service)
 // ============================================================================
 
 const notificationService = {
+    
     /**
-     * جلب الإشعارات مع دعم التصفح
+     * ✅ جلب قائمة الإشعارات مع الترقيم (Pagination)
      */
     async getNotifications(page: number = 1, limit: number = 20): Promise<NotificationsResponse> {
         try {
-            console.log(`🔔 [NotificationService] Fetching page ${page}`);
+            secureLog.info(`🔔 جلب الإشعارات - الصفحة: ${page}`);
             
             const response = await api.get<ApiResponse<NotificationsResponse['data']>>(
                 `/notifications?page=${page}&limit=${limit}`
             );
             
-            console.log('🔔 [NotificationService] Raw response:', response.data);
-
-            // استخراج البيانات
-            const data = extractData<NotificationsResponse['data']>(response.data, {
-                notifications: [],
-                stats: { unreadCount: 0, total: 0 }
-            });
-
-            const pagination = response.data?.pagination || {
-                page,
-                limit,
-                total: 0,
-                pages: 0,
-                hasMore: false
-            };
-
-            return {
-                success: response.data?.success || true,
-                data,
-                pagination
-            };
-        } catch (error) {
-            secureLog.error('❌ فشل جلب الإشعارات');
-            console.error('🔔 [NotificationService] Error:', error);
+            // في حال النجاح، نرجع البيانات والهيكل المطلوب للواجهة
+            if (response.data?.success) {
+                return {
+                    success: true,
+                    data: response.data.data,
+                    pagination: response.data.pagination || { page, limit, total: 0, pages: 0, hasMore: false }
+                };
+            }
             
+            throw new Error('فشل جلب البيانات من السيرفر');
+        } catch (error: any) {
+            secureLog.error('❌ فشل جلب الإشعارات', error);
+            
+            // إرجاع هيكل فارغ في حال الخطأ لمنع انهيار الواجهة (UI Crash)
             return {
                 success: false,
-                data: {
-                    notifications: [],
-                    stats: { unreadCount: 0, total: 0 }
-                },
-                pagination: {
-                    page,
-                    limit,
-                    total: 0,
-                    pages: 0,
-                    hasMore: false
-                }
+                data: { notifications: [], stats: { unreadCount: 0, total: 0 } },
+                pagination: { page, limit, total: 0, pages: 0, hasMore: false }
             };
         }
     },
 
     /**
-     * جلب عدد الإشعارات غير المقروءة
+     * ✅ جلب عدد الإشعارات غير المقروءة فقط
+     * مفيدة جداً لتحديث رقم الـ Badge في القائمة العلوية
      */
     async getUnreadCount(): Promise<number> {
         try {
             const response = await api.get<ApiResponse<{ count: number }>>('/notifications/unread-count');
-            const data = extractData<{ count: number }>(response.data, { count: 0 });
-            return data.count || 0;
+            return response.data?.data?.count || 0;
         } catch (error) {
             secureLog.error('❌ فشل جلب عدد الإشعارات');
-            console.error('🔔 [NotificationService] Unread count error:', error);
             return 0;
         }
     },
 
     /**
-     * تحديث إشعار كمقروء
+     * ✅ تحديث إشعار معين كمقروء
      */
     async markAsRead(notificationId: string): Promise<Notification> {
         try {
             const response = await api.patch<ApiResponse<Notification>>(`/notifications/${notificationId}/read`);
-            const notification = extractData<Notification>(response.data, null as any);
-            if (!notification) throw new Error('Invalid response structure');
-            return notification;
-        } catch (error) {
-            secureLog.error('❌ فشل تحديث الإشعار');
-            console.error('🔔 [NotificationService] Mark as read error:', error);
-            throw error;
+            
+            if (response.data?.success) {
+                return response.data.data;
+            }
+            throw new Error('فشل تحديث حالة الإشعار');
+        } catch (error: any) {
+            secureLog.error('❌ خطأ في تحديث الإشعار', error);
+            throw error.userMessage || 'لا يمكن تحديث الإشعار حالياً';
         }
     },
 
     /**
-     * تحديث كل الإشعارات كمقروءة
+     * ✅ تحديث كل الإشعارات كمقروءة دفعة واحدة
      */
     async markAllAsRead(): Promise<void> {
         try {
             await api.patch('/notifications/read-all');
-            console.log('🔔 [NotificationService] All notifications marked as read');
-        } catch (error) {
-            secureLog.error('❌ فشل تحديث كل الإشعارات');
-            console.error('🔔 [NotificationService] Mark all as read error:', error);
-            throw error;
+            secureLog.info('🔔 تم تحديد الكل كمقروء');
+        } catch (error: any) {
+            secureLog.error('❌ فشل تحديث الكل كمقروء');
+            throw error.userMessage || 'فشلت العملية، حاول لاحقاً';
         }
     },
 
     /**
-     * حذف إشعار
+     * ✅ حذف إشعار نهائياً
      */
     async deleteNotification(notificationId: string): Promise<void> {
         try {
+            secureLog.info(`🗑️ حذف الإشعار: ${notificationId}`);
             await api.delete(`/notifications/${notificationId}`);
-            console.log('🔔 [NotificationService] Notification deleted:', notificationId);
-        } catch (error) {
+        } catch (error: any) {
             secureLog.error('❌ فشل حذف الإشعار');
-            console.error('🔔 [NotificationService] Delete error:', error);
-            throw error;
+            throw error.userMessage || 'لا يمكن حذف الإشعار الآن';
         }
     },
 
     /**
-     * إنشاء إشعار جديد (للمسؤولين فقط)
+     * ✅ إنشاء إشعار يدوي (إداري أو داخلي)
      */
     async createNotification(data: CreateNotificationData): Promise<Notification> {
         try {
             const response = await api.post<ApiResponse<Notification>>('/notifications', data);
-            const notification = extractData<Notification>(response.data, null as any);
-            if (!notification) throw new Error('Invalid response structure');
-            return notification;
-        } catch (error) {
-            secureLog.error('❌ فشل إنشاء الإشعار');
-            console.error('🔔 [NotificationService] Create error:', error);
-            throw error;
+            
+            if (response.data?.success) {
+                return response.data.data;
+            }
+            throw new Error('فشل إنشاء الإشعار');
+        } catch (error: any) {
+            secureLog.error('❌ فشل إنشاء الإشعار', error);
+            throw error.userMessage || 'خطأ في إرسال الإشعار';
         }
     }
 };

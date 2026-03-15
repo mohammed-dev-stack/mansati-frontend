@@ -3,7 +3,7 @@
 
 // 🔐 AuthContext.tsx
 // مسؤول: إدارة حالة المصادقة بشكل آمن بالكامل عبر HttpOnly Cookies
-// @version 7.0.2 - متوافق تماماً مع backend الآمن
+// @version 7.1.0 - إصلاح مشكلة استخراج البيانات من ApiResponse الموحد
 /* cSpell:enable */
 
 import React, { createContext, useState, useEffect, ReactNode, useCallback, useRef } from "react";
@@ -15,7 +15,7 @@ import followService from "@/services/followService";
 import { useRouter } from "next/navigation";
 import { MESSAGES, SECURITY_CONFIG } from "@/utils/constants";
 import { secureLog } from "@/utils/security";
-import api from "@/services/api";
+import api, { ApiResponse } from "@/services/api";
 
 // ============================================================================
 // Types
@@ -23,13 +23,6 @@ import api from "@/services/api";
 
 interface AuthResponse {
   user: User;
-}
-
-interface ApiResponse<T = any> {
-  success: boolean;
-  data: T;
-  message?: string;
-  pagination?: any;
 }
 
 interface AuthContextType {
@@ -70,17 +63,14 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 // ============================================================================
 
 /**
- * استخراج البيانات من استجابة API مع التحقق من النجاح
+ * استخراج البيانات من استجابة API بعد التأكد من هيكل ApiResponse
+ * @param responseData - البيانات القادمة من الخادم (response.data)
  */
-const extractApiData = <T,>(response: any): T | null => {
-  if (response?.data?.success && response.data.data) {
-    return response.data.data as T;
+const extractApiData = <T,>(responseData: any): T | null => {
+  if (responseData?.success && responseData.data !== undefined) {
+    return responseData.data as T;
   }
-  if (response?.data && !response.data.success) {
-    secureLog.warn('API response not successful', response.data.message);
-    return null;
-  }
-  secureLog.warn('Unexpected API response structure', response);
+  secureLog.warn('Unexpected API response structure', responseData);
   return null;
 };
 
@@ -119,7 +109,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         if (refreshResponse.status === 200) {
           try {
             const meResponse = await api.get<ApiResponse<User>>('/users/me');
-            const userData = extractApiData<User>(meResponse);
+            const userData = extractApiData<User>(meResponse.data);
             if (userData) {
               setUser(userData);
               localStorage.setItem('user', JSON.stringify(userData));
@@ -180,7 +170,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     try {
       secureLog.log('🔵 محاولة تسجيل الدخول...');
       const response = await api.post<ApiResponse<{ user: User }>>('/auth/login', { email, password });
-      const data = extractApiData<{ user: User }>(response);
+      const data = extractApiData<{ user: User }>(response.data);
       if (!data?.user) {
         throw new Error('لم يتم استلام بيانات المستخدم');
       }
@@ -213,7 +203,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     try {
       secureLog.log('🔵 محاولة إنشاء حساب...');
       const response = await api.post<ApiResponse<{ user: User }>>('/auth/register', { name, email, password });
-      const data = extractApiData<{ user: User }>(response);
+      const data = extractApiData<{ user: User }>(response.data);
       if (!data?.user) {
         throw new Error('لم يتم استلام بيانات المستخدم');
       }
