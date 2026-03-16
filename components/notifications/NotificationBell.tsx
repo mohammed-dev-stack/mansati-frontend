@@ -1,8 +1,8 @@
 "use client";
 
 // 🔔 NotificationBell.tsx
-// مسؤول: عرض وإدارة الإشعارات بشكل آمن - نسخة محسنة بالكامل
-// الإصدار: 3.3.0 | آخر تحديث: 2026
+// مسؤول: عرض وإدارة الإشعارات بشكل آمن - نسخة محسنة مع تفعيل الإشعارات يدوياً
+// الإصدار: 3.4.0 | آخر تحديث: 2026
 
 import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { useRouter } from "next/navigation";
@@ -14,7 +14,7 @@ import { secureLog, sanitizeImageUrl } from "@/utils/security";
 import { formatDistanceToNow } from "date-fns";
 import { ar } from "date-fns/locale";
 import styles from "./NotificationBell.module.css";
-import { FaUserCircle, FaBell, FaCheckDouble } from "react-icons/fa";
+import { FaUserCircle, FaBell, FaCheckDouble, FaExclamationTriangle } from "react-icons/fa";
 
 // ============================================================================
 // دوال مساعدة
@@ -85,6 +85,8 @@ const NotificationBell = memo(() => {
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
     const [socketConnected, setSocketConnected] = useState(false);
+    const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+    const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
     
     const dropdownRef = useRef<HTMLDivElement>(null);
     const mounted = useRef(true);
@@ -109,11 +111,10 @@ const NotificationBell = memo(() => {
         setSocketConnected(isConnected);
     }, [isConnected]);
 
+    // ✅ التحقق من حالة الإذن عند التحميل، ولكن لا نطلب الإذن تلقائياً
     useEffect(() => {
-        if (typeof window !== 'undefined' && Notification.permission === "default") {
-            Notification.requestPermission().then(permission => {
-                secureLog.info('🔔 صلاحية الإشعارات', { permission });
-            });
+        if (typeof window !== 'undefined' && 'Notification' in window) {
+            setNotificationPermission(Notification.permission);
         }
     }, []);
 
@@ -155,7 +156,8 @@ const NotificationBell = memo(() => {
             
             setUnreadCount(prev => prev + 1);
 
-            if (Notification.permission === "granted") {
+            // ✅ عرض إشعار المتصفح فقط إذا كان الإذن granted
+            if (notificationPermission === 'granted') {
                 try {
                     new Notification(notification.title || "إشعار جديد", {
                         body: `${getSenderName(notification)}: ${notification.message}`,
@@ -166,6 +168,9 @@ const NotificationBell = memo(() => {
                 } catch (error) {
                     secureLog.error('❌ فشل عرض إشعار المتصفح');
                 }
+            } else if (notificationPermission === 'default') {
+                // إذا كان الإذن غير محدد، نعرض زر التفعيل بعد فترة قصيرة
+                setShowPermissionPrompt(true);
             }
         };
 
@@ -181,7 +186,7 @@ const NotificationBell = memo(() => {
             console.log('🔔 [NotificationBell] Cleaning up notification listener');
             unsubscribe();
         };
-    }, [user]);
+    }, [user, notificationPermission]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -248,6 +253,31 @@ const NotificationBell = memo(() => {
             loadNotifications();
         }
     }, [loading, hasMore]);
+
+    // ==========================================================================
+    // دالة طلب إذن الإشعارات (تستدعى يدوياً)
+    // ==========================================================================
+    const requestNotificationPermission = useCallback(async () => {
+        if (!('Notification' in window)) {
+            alert('متصفحك لا يدعم الإشعارات');
+            return;
+        }
+
+        if (notificationPermission === 'granted') return;
+
+        try {
+            const permission = await Notification.requestPermission();
+            setNotificationPermission(permission);
+            if (permission === 'granted') {
+                secureLog.info('✅ تم تفعيل الإشعارات');
+                setShowPermissionPrompt(false);
+            } else {
+                secureLog.warn('⚠️ المستخدم رفض الإشعارات');
+            }
+        } catch (error) {
+            secureLog.error('❌ فشل طلب إذن الإشعارات', error);
+        }
+    }, [notificationPermission]);
 
     // ==========================================================================
     // دوال التفاعل مع الإشعارات
@@ -418,6 +448,17 @@ const NotificationBell = memo(() => {
                                     </button>
                                 )}
                             </>
+                        )}
+
+                        {/* ✅ إضافة رسالة تفعيل الإشعارات إذا كان الإذن غير مفعل */}
+                        {showPermissionPrompt && notificationPermission !== 'granted' && (
+                            <div className={styles.permissionPrompt}>
+                                <FaExclamationTriangle className={styles.warningIcon} />
+                                <p>هل تريد تفعيل الإشعارات الفورية؟</p>
+                                <button onClick={requestNotificationPermission} className={styles.allowButton}>
+                                    تفعيل الإشعارات
+                                </button>
+                            </div>
                         )}
                     </div>
                 </div>
