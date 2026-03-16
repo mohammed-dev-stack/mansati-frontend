@@ -1,13 +1,24 @@
 // services/followService.ts
-// 👥 خدمة المتابعة - إدارة المتابعين - متوافقة مع API v5.0
-// الإصدار: 3.0.0 | آخر تحديث: 2026
+// 👥 خدمة المتابعة - إدارة المتابعين - نسخة محسنة مع ApiResponse
+// الإصدار: 2.1.0 | آخر تحديث: 2026
 
-import api, { ApiResponse } from "./api"; // ✅ استيراد النوع الموحد
-import { secureLog } from "@/utils/security";
+import api from "./api";
 
 // ============================================================================
-// أنواع البيانات (Interfaces)
+// أنواع البيانات
 // ============================================================================
+
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  message?: string;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
 
 export interface FollowStats {
   followersCount: number;
@@ -36,116 +47,131 @@ export interface FollowListResponse {
 }
 
 // ============================================================================
-// خدمة المتابعة (Follow Service)
+// الخدمة
 // ============================================================================
 
 const followService = {
-  
   /**
-   * ✅ متابعة مستخدم
+   * متابعة مستخدم
    */
   async followUser(userId: string): Promise<FollowStats> {
     try {
-      secureLog.info(`👥 [FollowService] Following user: ${userId}`);
+      console.log('👥 [FollowService] Following user:', userId);
       
       const response = await api.post<ApiResponse<FollowStats>>(`/users/${userId}/follow`);
       
-      if (response.data?.success) {
-        return response.data.data;
+      console.log('✅ [FollowService] Follow response:', response.data);
+      
+      if (!response.data?.success || !response.data.data) {
+        throw new Error(response.data?.message || 'فشلت عملية المتابعة');
       }
-      throw new Error(response.data?.message || 'فشلت عملية المتابعة');
-    } catch (error: any) {
-      secureLog.error('❌ [FollowService] Follow error:', error);
-      // استخدام userMessage المعالج في api.ts أو الرسالة القادمة من السيرفر
-      throw error.userMessage || error.response?.data?.message || 'فشلت عملية المتابعة';
+      
+      return response.data.data;
+    } catch (error) {
+      console.error('❌ [FollowService] Follow error:', error);
+      throw error;
     }
   },
 
   /**
-   * ✅ إلغاء متابعة مستخدم
+   * إلغاء متابعة مستخدم
    */
   async unfollowUser(userId: string): Promise<FollowStats> {
     try {
-      secureLog.info(`👥 [FollowService] Unfollowing user: ${userId}`);
+      console.log('👥 [FollowService] Unfollowing user:', userId);
       
       const response = await api.delete<ApiResponse<FollowStats>>(`/users/${userId}/follow`);
       
-      if (response.data?.success) {
-        return response.data.data;
+      console.log('✅ [FollowService] Unfollow response:', response.data);
+      
+      if (!response.data?.success || !response.data.data) {
+        throw new Error(response.data?.message || 'فشلت عملية إلغاء المتابعة');
       }
-      throw new Error(response.data?.message || 'فشلت عملية إلغاء المتابعة');
-    } catch (error: any) {
-      secureLog.error('❌ [FollowService] Unfollow error:', error);
-      throw error.userMessage || error.response?.data?.message || 'فشلت عملية إلغاء المتابعة';
+      
+      return response.data.data;
+    } catch (error) {
+      console.error('❌ [FollowService] Unfollow error:', error);
+      throw error;
     }
   },
 
   /**
-   * ✅ التحقق من حالة المتابعة لمستخدم معين
+   * التحقق من حالة المتابعة
    */
   async getFollowStatus(userId: string): Promise<FollowStats> {
     try {
+      console.log('👥 [FollowService] Getting follow status for:', userId);
+      
       const response = await api.get<ApiResponse<FollowStats>>(`/users/${userId}/follow/status`);
       
-      if (response.data?.success) {
-        return response.data.data;
+      if (!response.data?.success || !response.data.data) {
+        throw new Error(response.data?.message || 'فشل في الحصول على حالة المتابعة');
       }
-      throw new Error('فشل الحصول على الحالة');
-    } catch (error: any) {
-      secureLog.error('❌ [FollowService] Get follow status error:', error);
-      throw error.userMessage || 'فشل في الحصول على حالة المتابعة';
+      
+      return response.data.data;
+    } catch (error) {
+      console.error('❌ [FollowService] Get follow status error:', error);
+      throw error;
     }
   },
 
   /**
-   * ✅ جلب قائمة المتابعين (Followers)
+   * جلب قائمة المتابعين
    */
   async getFollowers(userId: string, page: number = 1, limit: number = 20): Promise<FollowListResponse> {
     try {
-      const response = await api.get<ApiResponse<FollowUser[]>>(
-        `/users/${userId}/followers?page=${page}&limit=${limit}`
-      );
+      const response = await api.get<ApiResponse<FollowUser[]>>(`/users/${userId}/followers?page=${page}&limit=${limit}`);
+      
+      if (!response.data?.success) {
+        return { data: [], pagination: { page, limit, total: 0, pages: 0 } };
+      }
       
       return {
-        data: response.data?.data || [],
-        pagination: response.data?.pagination || { page, limit, total: 0, pages: 0 }
+        data: response.data.data || [],
+        pagination: response.data.pagination || { page, limit, total: 0, pages: 0 }
       };
-    } catch (error: any) {
-      secureLog.error('❌ [FollowService] Get followers error:', error);
+    } catch (error) {
+      console.error('❌ [FollowService] Get followers error:', error);
       return { data: [], pagination: { page, limit, total: 0, pages: 0 } };
     }
   },
 
   /**
-   * ✅ جلب قائمة من نتابعهم (Following)
+   * جلب قائمة المتابَعين
    */
   async getFollowing(userId: string, page: number = 1, limit: number = 20): Promise<FollowListResponse> {
     try {
-      const response = await api.get<ApiResponse<FollowUser[]>>(
-        `/users/${userId}/following?page=${page}&limit=${limit}`
-      );
+      const response = await api.get<ApiResponse<FollowUser[]>>(`/users/${userId}/following?page=${page}&limit=${limit}`);
+      
+      if (!response.data?.success) {
+        return { data: [], pagination: { page, limit, total: 0, pages: 0 } };
+      }
       
       return {
-        data: response.data?.data || [],
-        pagination: response.data?.pagination || { page, limit, total: 0, pages: 0 }
+        data: response.data.data || [],
+        pagination: response.data.pagination || { page, limit, total: 0, pages: 0 }
       };
-    } catch (error: any) {
-      secureLog.error('❌ [FollowService] Get following error:', error);
+    } catch (error) {
+      console.error('❌ [FollowService] Get following error:', error);
       return { data: [], pagination: { page, limit, total: 0, pages: 0 } };
     }
   },
 
   /**
-   * ✅ جلب حالة المتابعة لمجموعة مستخدمين (Bulk)
-   * مفيدة جداً عند عرض قائمة مستخدمين لمعرفة من تتابعه منهم بطلب واحد
+   * الحصول على حالة المتابعة لمجموعة من المستخدمين دفعة واحدة
    */
   async getBulkFollowStatus(userIds: string[]): Promise<Record<string, boolean>> {
     try {
       const response = await api.post<ApiResponse<Record<string, boolean>>>('/users/follow/bulk-status', { userIds });
       
-      return response.data?.data || {};
-    } catch (error: any) {
-      secureLog.error('❌ [FollowService] Bulk status error:', error);
+      if (!response.data?.success || !response.data.data) {
+        console.warn('⚠️ [FollowService] Bulk status returned no data');
+        return {};
+      }
+      
+      return response.data.data;
+    } catch (error) {
+      console.error('❌ [FollowService] Bulk status error:', error);
       return {};
     }
   }

@@ -1,28 +1,16 @@
 // services/api.ts
-// 🌐 مسؤول: تكوين API مع طبقة أمان وتجديد التوكن ودعم البيئات المتعددة
-// @version 5.0.0 - Production Ready
+// 🌐 مسؤول: تكوين API مع طبقة أمان وتجديد التوكن
+// @version 4.3.0 - استخدام ديناميكي لرابط API من متغيرات البيئة
+// @lastUpdated 2026
 
 import axios from 'axios';
-import { API_CONFIG, MESSAGES } from '@/utils/constants';
+import { MESSAGES } from '@/utils/constants';
 import { secureLog } from '@/utils/security';
-
-// ============================================================================
-// تحديد الرابط الأساسي ديناميكياً (الدعم المحلي والإنتاج)
-// ============================================================================
-const getBaseURL = () => {
-  // إذا كان التطبيق يعمل في بيئة الإنتاج على Vercel
-  if (process.env.NODE_ENV === 'production') {
-    return 'https://mansati-backend-7aiy.onrender.com/api';
-  }
-  // في بيئة التطوير المحلية، نستخدم المتغير من ملف .env أو اللوكال هوست كاحتياط
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-};
-
-const BASE_API_URL = getBaseURL();
 
 // ============================================================================
 // واجهة الاستجابة الموحدة لجميع الخدمات
 // ============================================================================
+
 export interface ApiResponse<T = any> {
   success: boolean;
   data: T;
@@ -37,12 +25,33 @@ export interface ApiResponse<T = any> {
 }
 
 // ============================================================================
-// إنشاء كائن axios مع إعدادات متقدمة
+// تحديد رابط API الأساسي (ديناميكي)
 // ============================================================================
+// في بيئة Vercel (الإنتاج)، نستخدم NEXT_PUBLIC_API_URL
+// في بيئة التطوير المحلي، نستخدم fallback http://localhost:5000
+const getBaseUrl = (): string => {
+  // محاولة قراءة المتغير من البيئة (يتم تعيينه في Vercel)
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  
+  if (envUrl) {
+    // نزيل أي /api زائدة من النهاية لتوحيد المعالجة
+    return envUrl.replace(/\/api\/?$/, '');
+  }
+  
+  // القيمة الافتراضية للتطوير المحلي
+  return 'http://localhost:5000';
+};
+
+const BASE_URL = getBaseUrl();
+
+// ============================================================================
+// إنشاء كائن axios
+// ============================================================================
+
 const api = axios.create({
-  baseURL: BASE_API_URL,
-  timeout: 30000, // زيادة المهلة لـ 30 ثانية لتناسب Render المجاني
-  withCredentials: true,
+  baseURL: `${BASE_URL}/api`,   // الآن BASE_URL ديناميكي
+  timeout: 30000,                // زيادة المهلة إلى 30 ثانية (لأن خادم Render قد يكون بطيئاً في البداية)
+  withCredentials: true,         // ✅ ضروري لإرسال واستقبال الكوكيز
   headers: {
     'Content-Type': 'application/json',
     'X-Requested-With': 'XMLHttpRequest',
@@ -50,8 +59,9 @@ const api = axios.create({
 });
 
 // ============================================================================
-// إدارة طوابير تجديد التوكن (Token Refresh Logic)
+// إدارة طلبات التجديد المعلقة
 // ============================================================================
+
 let isRefreshing = false;
 let failedQueue: Array<{
   resolve: (value: any) => void;
@@ -60,20 +70,22 @@ let failedQueue: Array<{
 
 const processQueue = (error: any, token: string | null = null) => {
   failedQueue.forEach(prom => {
-    if (error) prom.reject(error);
-    else prom.resolve(token);
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
   });
   failedQueue = [];
 };
 
 // ============================================================================
-// Request Interceptor: تسجيل الطلبات الخارجة لأغراض المراقبة
+// Interceptors
 // ============================================================================
+
 api.interceptors.request.use(
   (config) => {
-    if (process.env.NODE_ENV === 'development') {
-      secureLog.info(`📤 API Request: ${config.method?.toUpperCase()} ${config.url}`);
-    }
+    secureLog.info(`📤 API Request: ${config.method?.toUpperCase()} ${config.url}`);
     return config;
   },
   (error) => {
@@ -82,15 +94,11 @@ api.interceptors.request.use(
   }
 );
 
-// ============================================================================
-// Response Interceptor: معالجة الأخطاء وتجديد الجلسة تلقائياً
-// ============================================================================
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // 1. معالجة أخطاء الشبكة (سيرفر متوقف أو مشكلة اتصال)
     if (!error.response) {
       secureLog.error('🌐 Network error:', error);
       return Promise.reject({
@@ -100,39 +108,69 @@ api.interceptors.response.use(
       });
     }
 
-    // 2. معالجة انتهاء الجلسة (Unauthorized - 401)
-    if (error.response.status === 401 && !originalRequest._retry) {
-      
-      // تجنب الدخول في حلقة مفرغة إذا فشل التجديد نفسه
-      if (originalRequest.url?.includes('/auth/refresh')) {
-        return Promise.reject({
-          message: 'انتهت الجلسة بالكامل',
-          userMessage: MESSAGES.ERRORS.UNAUTHORIZED,
-          requiresLogin: true
-        });
+    if (error.response.status !== 401) {
+      let userMessage = MESSAGES.ERRORS.DEFAULT;
+      switch (error.response.status) {
+        case 400:
+          userMessage = error.response.data?.message || MESSAGES.ERRORS.VALIDATION;
+          break;
+        case 403:
+          userMessage = MESSAGES.ERRORS.FORBIDDEN;
+          break;
+        case 404:
+          userMessage = MESSAGES.ERRORS.NOT_FOUND;
+          break;
+        case 429:
+          userMessage = 'محاولات كثيرة جداً. حاول بعد قليل';
+          break;
+        case 500:
+          userMessage = MESSAGES.ERRORS.SERVER;
+          break;
       }
+      return Promise.reject({
+        status: error.response.status,
+        data: error.response.data,
+        userMessage,
+      });
+    }
 
+    if (originalRequest.url === '/auth/refresh') {
+      return Promise.reject({
+        message: 'انتهت الجلسة، يرجى تسجيل الدخول مجدداً',
+        userMessage: MESSAGES.ERRORS.UNAUTHORIZED,
+      });
+    }
+
+    if (error.response.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
-        })
-          .then(() => api(originalRequest))
-          .catch(err => Promise.reject(err));
+        }).then(() => {
+          return api(originalRequest);
+        }).catch(err => Promise.reject(err));
       }
 
       originalRequest._retry = true;
       isRefreshing = true;
 
       try {
-        secureLog.log('🔄 محاولة تجديد الجلسة تلقائياً...');
-        // نستخدم axios الخام لتجنب الـ interceptor الخاص بـ api
-        await axios.post(`${BASE_API_URL}/auth/refresh`, {}, { withCredentials: true });
+        secureLog.log('🔄 محاولة تجديد التوكن عبر /auth/refresh...');
         
-        secureLog.log('✅ تم التجديد، إعادة إرسال الطلب الأصلي...');
-        processQueue(null);
+        // استخدم نفس BASE_URL هنا أيضاً
+        await axios.post(
+          `${BASE_URL}/api/auth/refresh`,
+          {},
+          { withCredentials: true }
+        );
+
+        secureLog.log('✅ تم تجديد التوكن بنجاح');
+        processQueue(null, null);
+
         return api(originalRequest);
       } catch (refreshError) {
-        processQueue(refreshError);
+        secureLog.error('❌ فشل تجديد التوكن', refreshError);
+        processQueue(refreshError, null);
+
         return Promise.reject({
           message: 'انتهت الجلسة، يرجى تسجيل الدخول مجدداً',
           userMessage: MESSAGES.ERRORS.UNAUTHORIZED,
@@ -143,23 +181,7 @@ api.interceptors.response.use(
       }
     }
 
-    // 3. معالجة بقية أخطاء HTTP
-    let userMessage = MESSAGES.ERRORS.DEFAULT;
-    const status = error.response.status;
-
-    switch (status) {
-      case 400: userMessage = error.response.data?.message || MESSAGES.ERRORS.VALIDATION; break;
-      case 403: userMessage = MESSAGES.ERRORS.FORBIDDEN; break;
-      case 404: userMessage = MESSAGES.ERRORS.NOT_FOUND; break;
-      case 429: userMessage = 'محاولات كثيرة جداً، يرجى الانتظار دقيقة'; break;
-      case 500: userMessage = MESSAGES.ERRORS.SERVER; break;
-    }
-
-    return Promise.reject({
-      status,
-      data: error.response.data,
-      userMessage,
-    });
+    return Promise.reject(error);
   }
 );
 
