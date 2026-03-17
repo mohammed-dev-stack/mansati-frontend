@@ -2,6 +2,8 @@
 
 // app/admin-login/page.tsx
 // 👑 مسؤول: صفحة دخول خاصة بإنشاء أول أدمن
+// @version 3.0.0
+// @lastUpdated 2026
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -15,6 +17,16 @@ export default function AdminLoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // تحديد الرابط الأساسي ديناميكياً: يستخدم المتغير البيئي إن وُجد، أو localhost في التطوير المحلي
+  const getBaseUrl = (): string => {
+    if (typeof window !== "undefined") {
+      // في المتصفح، نستخدم المتغير البيئي NEXT_PUBLIC_API_URL
+      return process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    }
+    // في حالة الـ SSR (نادراً هنا لأن الصفحة "use client")، نعطي قيمة افتراضية
+    return "http://localhost:5000";
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -24,8 +36,11 @@ export default function AdminLoginPage() {
       // إنشاء Basic Auth token
       const token = btoa(`${username}:${password}`);
       
+      // الحصول على الرابط الأساسي
+      const baseUrl = getBaseUrl();
+      
       // محاولة إنشاء أول أدمن (إذا لم يكن موجوداً)
-      const response = await fetch('http://localhost:5000/api/super-admin/create-first-admin', {
+      const response = await fetch(`${baseUrl}/api/super-admin/create-first-admin`, {
         method: 'POST',
         headers: {
           'Authorization': `Basic ${token}`,

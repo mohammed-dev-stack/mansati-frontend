@@ -2,7 +2,7 @@
 
 // app/admin/setup/page.tsx
 // 👑 مسؤول: صفحة إعداد الأدمن بعد المصادقة
-// @version 2.0.0
+// @version 3.0.0
 // @lastUpdated 2026
 
 import { useState, useEffect } from "react";
@@ -16,6 +16,14 @@ export default function AdminSetupPage() {
   const [status, setStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // تحديد الرابط الأساسي ديناميكياً
+  const getBaseUrl = (): string => {
+    if (typeof window !== "undefined") {
+      return process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    }
+    return "http://localhost:5000";
+  };
 
   useEffect(() => {
     // التحقق من المصادقة
@@ -31,8 +39,9 @@ export default function AdminSetupPage() {
   const checkStatus = async () => {
     try {
       const token = btoa(`${process.env.NEXT_PUBLIC_ADMIN_USER}:${process.env.NEXT_PUBLIC_ADMIN_PASS}`);
+      const baseUrl = getBaseUrl();
       
-      const response = await fetch('http://localhost:5000/api/super-admin/status', {
+      const response = await fetch(`${baseUrl}/api/super-admin/status`, {
         headers: {
           'Authorization': `Basic ${token}`
         }
@@ -63,8 +72,37 @@ export default function AdminSetupPage() {
   };
 
   const goToAdminDashboard = () => {
-    // ✅ التوجيه المباشر إلى لوحة التحكم
     router.push('/admin');
+  };
+
+  const createFirstAdmin = async () => {
+    setLoading(true);
+    try {
+      const token = btoa(`${process.env.NEXT_PUBLIC_ADMIN_USER}:${process.env.NEXT_PUBLIC_ADMIN_PASS}`);
+      const baseUrl = getBaseUrl();
+      
+      const response = await fetch(`${baseUrl}/api/super-admin/create-first-admin`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        alert('✅ تم إنشاء حساب الأدمن بنجاح!');
+        
+        // ✅ بعد الإنشاء، سجل الدخول واذهب للوحة التحكم
+        await login(process.env.NEXT_PUBLIC_ADMIN_EMAIL!, process.env.NEXT_PUBLIC_ADMIN_PASS!);
+        router.push('/admin');
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'فشل إنشاء الأدمن');
+      }
+    } catch (err: any) {
+      setError(err.message || 'فشل إنشاء الأدمن');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) {
@@ -93,33 +131,7 @@ export default function AdminSetupPage() {
           <h2>إنشاء أول أدمن</h2>
           <p>سيتم إنشاء حساب الأدمن الأول باستخدام بيانات ملف .env</p>
           <button 
-            onClick={async () => {
-              setLoading(true);
-              try {
-                const token = btoa(`${process.env.NEXT_PUBLIC_ADMIN_USER}:${process.env.NEXT_PUBLIC_ADMIN_PASS}`);
-                const response = await fetch('http://localhost:5000/api/super-admin/create-first-admin', {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Basic ${token}`
-                  }
-                });
-                
-                if (response.ok) {
-                  alert('✅ تم إنشاء حساب الأدمن بنجاح!');
-                  
-                  // ✅ بعد الإنشاء، سجل الدخول واذهب للوحة التحكم
-                  await login(process.env.NEXT_PUBLIC_ADMIN_EMAIL!, process.env.NEXT_PUBLIC_ADMIN_PASS!);
-                  router.push('/admin');
-                } else {
-                  const errorData = await response.json();
-                  throw new Error(errorData.message || 'فشل إنشاء الأدمن');
-                }
-              } catch (err: any) {
-                setError(err.message || 'فشل إنشاء الأدمن');
-              } finally {
-                setLoading(false);
-              }
-            }}
+            onClick={createFirstAdmin}
             className={styles.createButton}
           >
             إنشاء حساب الأدمن الأول
