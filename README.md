@@ -1,20 +1,19 @@
-```markdown
 ## 🛠️ التقنيات المستخدمة (Tech Stack)
 
 | المجال | التقنية | الوصف |
-|--------|---------|--------|
-| **🏗️ البنية التحتية (Core)** | ![Next.js](https://img.shields.io/badge/Next.js-15.2-black?style=for-the-badge&logo=next.js) | إطار العمل: التوجيه الذكي، SSR، وتحسين الأداء. |
-| | ![React](https://img.shields.io/badge/React-19.0-61dafb?style=for-the-badge&logo=react&logoColor=black) | بناء مكونات تفاعلية متقدمة. |
-| | ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=for-the-badge&logo=typescript) | لغة البرمجة: ضمان أمان الأنواع وتجنب أخطاء التشغيل. |
-| **🎨 التصميم وتجربة المستخدم (UI/UX)** | ✨ **CSS Modules** | تنسيق معزول لضمان عدم تداخل الأنماط بين المكونات. |
-| | 📊 **Recharts** | عرض إحصائيات المنصة برسوم بيانية تفاعلية. |
-| | 🖼️ **React Icons + Font Awesome** | مزيج احترافي للأيقونات. |
-| **🔐 الاتصال والأمان (Backend Integration)** | ⚡ **Socket.io Client** | إرسال واستقبال الإشعارات فوراً. |
-| | 📡 **Axios** | مع نظام `Interceptors` لإدارة التوكنات والطلبات. |
-| | 🛡️ **JWT Decode** | للتحقق من صلاحيات المستخدم محلياً. |
-| **🛠️ جودة الكود وإدارة الحالة** | 🧠 **React Context + Custom Hooks** | لتنظيم منطق الأعمال. |
-| | 📅 **date-fns** | لمعالجة الأوقات بمرونة كاملة باللغة العربية. |
-| | 💎 **ESLint + Prettier** | لضمان كود نظيف وموحد. |
+| :--- | :--- | :--- |
+| **🏗️ البنية التحتية (Core)** | ![Next.js](https://img.shields.io/badge/Next.js-15.2-black?style=flat&logo=next.js) | إطار العمل: التوجيه الذكي، SSR، وتحسين الأداء. |
+| | ![React](https://img.shields.io/badge/React-19.0-61dafb?style=flat&logo=react&logoColor=black) | بناء مكونات تفاعلية متقدمة. |
+| | ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=flat&logo=typescript) | لغة البرمجة: ضمان أمان الأنواع وتجنب أخطاء التشغيل. |
+| **🎨 التصميم (UI/UX)** | ✨ CSS Modules | تنسيق معزول لضمان عدم تداخل الأنماط بين المكونات. |
+| | 📊 Recharts | عرض إحصائيات المنصة برسوم بيانية تفاعلية. |
+| | 🖼️ React Icons + Font Awesome | مزيج احترافي للأيقونات. |
+| **🔐 الاتصال والأمان** | ⚡ Socket.io Client | إرسال واستقبال الإشعارات فوراً. |
+| | 📡 Axios | مع نظام `Interceptors` لإدارة التوكنات والطلبات. |
+| | 🛡️ JWT Decode | للتحقق من صلاحيات المستخدم محلياً. |
+| **🛠️ جودة الكود وإدارة الحالة** | 🧠 React Context + Custom Hooks | تنظيم منطق الأعمال بالكامل. |
+| | 📅 date-fns | معالجة الأوقات بمرونة كاملة باللغة العربية. |
+| | 💎 ESLint + Prettier | لضمان كود نظيف، موحد، واحترافي. |
 
 ---
 
