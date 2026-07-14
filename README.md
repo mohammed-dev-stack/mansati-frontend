@@ -262,8 +262,6 @@ NEXT_PUBLIC_SOCKET_URL=http://localhost:5000
 </div>
 ```
 
----
-
 2. **تثبيت الاعتماديات**
    ```bash
    npm install
